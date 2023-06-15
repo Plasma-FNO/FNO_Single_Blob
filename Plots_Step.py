@@ -1,16 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on 6 Jan 2023
-@author: vgopakum
-FNO modelled over the MHD data built using JOREK for multi-blob diffusion. 
-
-FNO combined with UNet - FUNet
-"""
 # %%
-configuration = {"Case": 'Multi-Blobs',
+configuration = {"Case": 'Single-Blobs',
                  "Field": 'rho, Phi, T',
-                 "Field_Mixing": 'UNet',
+                 "Field_Mixing": 'Channel',
                  "Type": '2D Time',
                  "Epochs": 500,
                  "Batch Size": 10,
@@ -26,20 +17,24 @@ configuration = {"Case": 'Multi-Blobs',
                  "T_in": 10,    
                  "T_out": 40,
                  "Step": 5,
-                 "Modes":32,
-                 "Width_time": 64, #FNO
+                 "Modes":16,
+                 "Width_time":32, #FNO
                  "Width_vars": 0, #U-Net
                  "Variables":3, 
                  "Noise":0.0, 
                  "Loss Function": 'LP Loss',
                  "Spatial Resolution": 1,
                  "Temporal Resolution": 1,
+                #  "UQ": 'Dropout',
+                #  "Dropout Rate": 0.9
                  }
+
 
 # %%
 from simvue import Run
-run = Run()
-run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Multi-Blobs', 'MultiVariable', 'FU-Net', "Skip_Connect"], metadata=configuration)
+run = Run(mode='disabled')
+run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Single-Blob', 'MultiVariable', "Skip_Connect", "rho-T"], metadata=configuration)
+
 
 # %% 
 
@@ -178,83 +173,115 @@ class RangeNormalizer(object):
         self.a = self.a.cpu()
         self.b = self.b.cpu()
 
-#normalization, rangewise but single value. 
+# #normalization, rangewise but single value. 
+# class MinMax_Normalizer(object):
+#     def __init__(self, x, low=0.0, high=1.0):
+#         super(MinMax_Normalizer, self).__init__()
+#         min_u = torch.min(x[:,0,:,:,:])
+#         max_u = torch.max(x[:,0,:,:,:])
+
+#         self.a_u = (high - low)/(max_u - min_u)
+#         self.b_u = -self.a_u*max_u + high
+
+#         min_v = torch.min(x[:,1,:,:,:])
+#         max_v = torch.max(x[:,1,:,:,:])
+
+#         self.a_v = (high - low)/(max_v - min_v)
+#         self.b_v = -self.a_v*max_v + high
+
+#         min_p = torch.min(x[:,2,:,:,:])
+#         max_p = torch.max(x[:,2,:,:,:])
+
+#         self.a_p = (high - low)/(max_p - min_p)
+#         self.b_p = -self.a_p*max_p + high
+        
+
+#     def encode(self, x):
+#         s = x.size()
+
+#         u = x[:,0,:,:,:]
+#         u = self.a_u*u + self.b_u
+
+#         v = x[:,1,:,:,:]
+#         v = self.a_v*v + self.b_v
+
+#         p = x[:,2,:,:,:]
+#         p = self.a_p*p + self.b_p
+        
+#         x = torch.stack((u,v,p), dim=1)
+
+#         return x
+
+#     def decode(self, x):
+#         s = x.size()
+
+#         u = x[:,0,:,:,:]
+#         u = (u - self.b_u)/self.a_u
+        
+#         v = x[:,1,:,:,:]
+#         v = (v - self.b_v)/self.a_v
+
+#         p = x[:,2,:,:,:]
+#         p = (p - self.b_p)/self.a_p
+
+
+#         x = torch.stack((u,v,p), dim=1)
+
+#         return x
+
+#     def cuda(self):
+#         self.a_u = self.a_u.cuda()
+#         self.b_u = self.b_u.cuda()
+        
+#         self.a_v = self.a_v.cuda()
+#         self.b_v = self.b_v.cuda() 
+
+#         self.a_p = self.a_p.cuda()
+#         self.b_p = self.b_p.cuda()
+
+
+#     def cpu(self):
+#         self.a_u = self.a_u.cpu()
+#         self.b_u = self.b_u.cpu()
+        
+#         self.a_v = self.a_v.cpu()
+#         self.b_v = self.b_v.cpu()
+
+#         self.a_p = self.a_p.cpu()
+#         self.b_p = self.b_p.cpu()
+
+
+#normalization, rangewise but across the full domain 
 class MinMax_Normalizer(object):
     def __init__(self, x, low=-1.0, high=1.0):
         super(MinMax_Normalizer, self).__init__()
-        min_u = torch.min(x[:,0,:,:,:])
-        max_u = torch.max(x[:,0,:,:,:])
+        mymin = torch.min(x)
+        mymax = torch.max(x)
 
-        self.a_u = (high - low)/(max_u - min_u)
-        self.b_u = -self.a_u*max_u + high
-
-        min_v = torch.min(x[:,1,:,:,:])
-        max_v = torch.max(x[:,1,:,:,:])
-
-        self.a_v = (high - low)/(max_v - min_v)
-        self.b_v = -self.a_v*max_v + high
-
-        min_p = torch.min(x[:,2,:,:,:])
-        max_p = torch.max(x[:,2,:,:,:])
-
-        self.a_p = (high - low)/(max_p - min_p)
-        self.b_p = -self.a_p*max_p + high
-        
+        self.a = (high - low)/(mymax - mymin)
+        self.b = -self.a*mymax + high
 
     def encode(self, x):
         s = x.size()
-
-        u = x[:,0,:,:,:]
-        u = self.a_u*u + self.b_u
-
-        v = x[:,1,:,:,:]
-        v = self.a_v*v + self.b_v
-
-        p = x[:,2,:,:,:]
-        p = self.a_p*p + self.b_p
-        
-        x = torch.stack((u,v,p), dim=1)
-
+        x = x.reshape(s[0], -1)
+        x = self.a*x + self.b
+        x = x.view(s)
         return x
 
     def decode(self, x):
         s = x.size()
-
-        u = x[:,0,:,:,:]
-        u = (u - self.b_u)/self.a_u
-        
-        v = x[:,1,:,:,:]
-        v = (v - self.b_v)/self.a_v
-
-        p = x[:,2,:,:,:]
-        p = (p - self.b_p)/self.a_p
-
-
-        x = torch.stack((u,v,p), dim=1)
-
+        x = x.reshape(s[0], -1)
+        x = (x - self.b)/self.a
+        x = x.view(s)
         return x
 
     def cuda(self):
-        self.a_u = self.a_u.cuda()
-        self.b_u = self.b_u.cuda()
-        
-        self.a_v = self.a_v.cuda()
-        self.b_v = self.b_v.cuda() 
-
-        self.a_p = self.a_p.cuda()
-        self.b_p = self.b_p.cuda()
-
+        self.a = self.a.cuda()
+        self.b = self.b.cuda()
 
     def cpu(self):
-        self.a_u = self.a_u.cpu()
-        self.b_u = self.b_u.cpu()
-        
-        self.a_v = self.a_v.cpu()
-        self.b_v = self.b_v.cpu()
-
-        self.a_p = self.a_p.cpu()
-        self.b_p = self.b_p.cpu()
-
+        self.a = self.a.cpu()
+        self.b = self.b.cpu()
 
 
 # %%
@@ -333,8 +360,6 @@ T = configuration['T_out']
 step = configuration['Step']
 num_vars = configuration['Variables']
 
-
-
 # %%
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -354,79 +379,6 @@ class MLP(nn.Module):
         x = self.mlp2(x)
         return x
 
-
-class UNet3d(nn.Module):
-
-    def __init__(self, in_channels, out_channels, init_features=64):
-        super(UNet3d, self).__init__()
-
-        features = init_features
-        self.encoder1 = UNet3d._block(in_channels, features, name="enc1")
-        self.pool1 = nn.MaxPool3d(kernel_size=2, stride=2)
-
-
-        self.bottleneck = UNet3d._block(features, features * 2, name="bottleneck")
-
-
-        self.upconv1 = nn.ConvTranspose3d(
-            features, features, kernel_size=(2,2,2), stride=2
-        )
-        self.decoder1 = UNet3d._block(features*2, features, name="dec1")
-
-        self.conv = nn.Conv3d(
-            in_channels=features, out_channels=out_channels, kernel_size=1
-        )
-
-    def forward(self, x):
-        enc1 = self.encoder1(x)
-        bottleneck = self.pool1(enc1)
-        dec1 = self.upconv1(bottleneck)
-        dec1 = torch.cat((dec1, enc1), dim=1)
-        dec1 = self.decoder1(dec1)
-        return self.conv(dec1)
-
-    @staticmethod
-    def _block(in_channels, features, name):
-        return nn.Sequential(
-            OrderedDict(
-                [
-                    (
-                        name + "conv1",
-                        nn.Conv3d(
-                            in_channels=in_channels,
-                            out_channels=features,
-                            kernel_size=3,
-                            padding=1,
-                            bias=False,
-                        ),
-                    ),
-                    (name + "norm1", nn.BatchNorm3d(num_features=features)),
-                    (name + "tanh1", nn.Tanh()),
-                    # (
-                    #     name + "conv2",
-                    #     nn.Conv3d(
-                    #         in_channels=features,
-                    #         out_channels=features,
-                    #         kernel_size=3,
-                    #         padding=1,
-                    #         bias=False,
-                    #     ),
-                    # ),
-                    # (name + "norm2", nn.BatchNorm3d(num_features=features)),
-                    # (name + "tanh2", nn.Tanh()),
-                ]
-            )
-        )
-     
-    def count_params(self):
-        c = 0
-        for p in self.parameters():
-            c += reduce(operator.mul, list(p.size()))
-
-        return c
-
-# unet = UNet3d(12, 32)
-# unet(torch.ones(5, 12, 106, 106, 32)).shape
 # %%
 ################################################################
 # fourier layer
@@ -493,9 +445,9 @@ class FNO2d(nn.Module):
 
 # %%
 
-class FU_Net(nn.Module):
+class FNO_multi(nn.Module):
     def __init__(self, modes1, modes2, width_vars, width_time):
-        super(FU_Net, self).__init__()
+        super(FNO_multi, self).__init__()
 
         """
         The overall network. It contains 4 layers of the Fourier layer.
@@ -515,8 +467,9 @@ class FU_Net(nn.Module):
         self.width_vars = width_vars
         self.width_time = width_time
 
-        # self.fc0_var = nn.Linear(num_vars, self.width_vars)
         self.fc0_time  = nn.Linear(T_in+2, self.width_time)
+
+        # self.padding = 8 # pad the domain if input is non-periodic
 
         self.f0 = FNO2d(self.modes1, self.modes2, self.width_time)
         self.f1 = FNO2d(self.modes1, self.modes2, self.width_time)
@@ -525,13 +478,18 @@ class FU_Net(nn.Module):
         self.f4 = FNO2d(self.modes1, self.modes2, self.width_time)
         self.f5 = FNO2d(self.modes1, self.modes2, self.width_time)
 
-        # self.unet = UNet3d(T_in+2, self.width_time)
+        # self.f0 = FNO2d(32, 32, self.width_time)
+        # self.f1 = FNO2d(32, 16, self.width_time)
+        # self.f2 = FNO2d(16, 8, self.width_time)
+        # self.f3 = FNO2d(8, 4, self.width_time)
+        # self.f4 = FNO2d(4, 2, self.width_time)
+        # self.f5 = FNO2d(2, 1, self.width_time)
+
+        # self.dropout = nn.Dropout(p=0.1)
 
         # self.norm = nn.InstanceNorm2d(self.width)
         self.norm = nn.Identity()
 
-        # self.fc1_var = nn.Linear(self.width_vars, 64)   
-        # self.fc2_var = nn.Linear(64, num_vars)
 
         self.fc1_time = nn.Linear(self.width_time, 128)
         self.fc2_time = nn.Linear(128, step)
@@ -541,32 +499,31 @@ class FU_Net(nn.Module):
         grid = self.get_grid(x.shape, x.device)
         x = torch.cat((x, grid), dim=-1)
 
-        # x_u = x.permute(0,4,2,3,1)
-        # x_u = self.fc0_var(x_u)
-
-        # x_u = self.unet(x_u)
-
-        # x_u = self.fc1_var(x_u)
-        # x_u = F.gelu(x_u)
-        # x_u = self.fc2_var(x_u)
-        # x_u = x_u.permute(0,4,2,3,1)
 
         x = self.fc0_time(x)
         x = x.permute(0, 4, 1, 2, 3)
+        # x = self.dropout(x)
+
+        # x = F.pad(x, [0,self.padding, 0,self.padding]) # pad the domain if input is non-periodic
 
         x0 = self.f0(x)
-        x = self.f1(x0)
+        x = self.f1(x)
         x = self.f2(x) + x0 
+        # x = self.dropout(x)
         x1 = self.f3(x)
-        x = self.f4(x1)
+        x = self.f4(x)
         x = self.f5(x) + x1 
 
+        # x = self.dropout(x)
+
+        # x = x[..., :-self.padding, :-self.padding] # pad the domain if input is non-periodic
 
         x = x.permute(0, 2, 3, 4, 1)
-        x = x #+ x_u
+        x = x 
 
         x = self.fc1_time(x)
         x = F.gelu(x)
+        # x = self.dropout(x)
         x = self.fc2_time(x)
         
         return x
@@ -597,8 +554,6 @@ class FU_Net(nn.Module):
 
         return c
 
-# model = FU_Net(modes, modes, width_vars, width_time)
-# model(torch.ones(5, 3, 106, 106, T_in)).shape
 
 
 # %%
@@ -608,7 +563,7 @@ class FU_Net(nn.Module):
 ################################################################
 
 # %%
-data = data_loc + '/Data/MHD_multi_blobs.npz'
+data = data_loc + '/Data/MHD_single_blob.npz'
 
 # %%
 field = configuration['Field']
@@ -642,7 +597,7 @@ y_grid = np.load(data)['Zgrid'][:,0].astype(np.float32)
 t_grid = np.load(data)['time'].astype(np.float32)
 
 
-ntrain = 240
+ntrain = 160
 ntest = 20
 S = 106 #Grid Size
 size_x = S
@@ -695,8 +650,9 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 # training and evaluation
 ################################################################
+model = FNO_multi(modes, modes, width_vars, width_time)
+model.load_state_dict(torch.load(file_loc + '/Models/FNO_single_blob_complicated-nut.pth', map_location=torch.device('cpu')))
 
-model = FU_Net(modes, modes, width_vars, width_time)
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -715,87 +671,9 @@ if torch.cuda.is_available():
     y_normalizer.cuda()
 
 # %%
-start_time = time.time()
-for ep in tqdm(range(epochs)):
-    model.train()
-    t1 = default_timer()
-    train_l2_step = 0
-    train_l2_full = 0
-    for xx, yy in train_loader:
-        optimizer.zero_grad()
-        loss = 0
-        xx = xx.to(device)
-        yy = yy.to(device)
-        # xx = additive_noise(xx)
-
-        for t in range(0, T, step):
-            y = yy[..., t:t + step]
-            im = model(xx)
-            print(im.shape), print(y.shape)
-            loss += myloss(im.reshape(batch_size, -1), y.reshape(batch_size, -1))
-            # loss += myloss(im.reshape(batch_size, -1)*torch.log(im.reshape(batch_size, -1)), y.reshape(batch_size, -1)*torch.log(y.reshape(batch_size, -1)))
-
-            if t == 0:
-                pred = im
-            else:
-                pred = torch.cat((pred, im), -1)
-
-            xx = torch.cat((xx[..., step:], im), dim=-1)
-
-        train_l2_step += loss.item()
-        l2_full = myloss(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1))
-        train_l2_full += l2_full.item()
-
-        loss.backward()
-        # l2_full.backward()
-        optimizer.step()
-
-    test_l2_step = 0
-    test_l2_full = 0
-    with torch.no_grad():
-        for xx, yy in test_loader:
-            loss = 0
-            xx = xx.to(device)
-            yy = yy.to(device)
-
-            for t in range(0, T, step):
-                y = yy[..., t:t + step]
-                im = model(xx)
-                loss += myloss(im.reshape(batch_size, -1), y.reshape(batch_size, -1))
-
-                if t == 0:
-                    pred = im
-                else:
-                    pred = torch.cat((pred, im), -1)
-
-            xx = torch.cat((xx[..., step:], im), dim=-1)
-
-            # pred = y_normalizer.decode(pred)
-
-            test_l2_step += loss.item()
-            test_l2_full += myloss(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1)).item()
-
-    t2 = default_timer()
-    scheduler.step()
-
-    train_loss = train_l2_full / ntrain
-    test_loss = test_l2_full / ntest
-
-    print('Epochs: %d, Time: %.2f, Train Loss per step: %.3e, Train Loss: %.3e, Test Loss per step: %.3e, Test Loss: %.3e' % (ep, t2 - t1, train_l2_step / ntrain / (T / step), train_loss, test_l2_step / ntest / (T / step), test_loss))
-
-    run.log_metrics({'Train Loss': train_loss, 
-                    'Test Loss': test_loss})
-
-train_time = time.time() - start_time
-# %%
-#Saving the Model
-model_loc = file_loc + '/Models/FNO_multi_blobs_' + run.name + '.pth'
-torch.save(model.state_dict(),  model_loc)
-
-# %%
 #Testing 
 batch_size = 1
-test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u), batch_size=1, shuffle=False)
+test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u_encoded), batch_size=1, shuffle=False)
 pred_set = torch.zeros(test_u.shape)
 index = 0
 with torch.no_grad():
@@ -822,7 +700,8 @@ with torch.no_grad():
         index += 1
         print(t2-t1)
 
-# %%
+# %% 
+print(pred_set.shape, test_u.shape)
 #Logging Metrics 
 MSE_error = (pred_set - test_u_encoded).pow(2).mean()
 MAE_error = torch.abs(pred_set - test_u_encoded).mean()
@@ -832,24 +711,29 @@ print('(MSE) Testing Error: %.3e' % (MSE_error))
 print('(MAE) Testing Error: %.3e' % (MAE_error))
 print('(LP) Testing Error: %.3e' % (LP_error))
 
-run.update_metadata({'Training Time': float(train_time),
-                     'MSE Test Error': float(MSE_error),
+run.update_metadata({'MSE Test Error': float(MSE_error),
                      'MAE Test Error': float(MAE_error),
                      'LP Test Error': float(LP_error)
                     })
 
+pred_set_encoded = pred_set
 pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
+# %% 
+if configuration["Physics Normalisation"] == 'Yes':
+    pred_set[:,0:1,...] = pred_set[:,0:1,...] * 1e20
+    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e6
+    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e5
+
+
+    test_u[:,0:1,...] = test_u[:,0:1,...] * 1e20
+    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e6
+    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e5
 
 # %%
 #Plotting the comparison plots
 
 idx = np.random.randint(0,ntest) 
 idx = 5
-
-if configuration['Log Normalisation'] == 'Yes':
-    test_u = torch.exp(test_u)
-    pred_set = torch.exp(pred_set)
-
 
 # %%
 output_plot = []
@@ -915,48 +799,379 @@ for dim in range(num_vars):
 
     plt.title(dims[dim])
 
-    output_plot.append(file_loc + '/Plots/MultiBlobs_' + dims[dim] + '_' + run.name + '.png')
-    plt.savefig(output_plot[dim])
+
+pred_set_encoded_5 = pred_set_encoded
+test_set_encoded_5 = test_u_encoded
+
 
 # %%
+#Step = 10 
+step = 10
+
+################################################################
+# training and evaluation
+################################################################
+model = FNO_multi(modes, modes, width_vars, width_time)
+model.load_state_dict(torch.load(file_loc + '/Models/FNO_single_blob_slim-fennel.pth', map_location=torch.device('cpu')))
+
+model.to(device)
+
+print("Number of model params : " + str(model.count_params()))
+
+
+
+# %%
+#Testing 
+batch_size = 1
+test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u_encoded), batch_size=1, shuffle=False)
+pred_set = torch.zeros(test_u.shape)
+index = 0
+with torch.no_grad():
+    for xx, yy in tqdm(test_loader):
+        loss = 0
+        xx, yy = xx.to(device), yy.to(device)
+        # xx = additive_noise(xx)
+        t1 = default_timer()
+        for t in range(0, T, step):
+            y = yy[..., t:t + step]
+            out = model(xx)
+            loss += myloss(out.reshape(batch_size, -1), y.reshape(batch_size, -1))
+
+            if t == 0:
+                pred = out
+            else:
+                pred = torch.cat((pred, out), -1)       
+
+            xx = torch.cat((xx[..., step:], out), dim=-1)
+
+        t2 = default_timer()
+        # pred = y_normalizer.decode(pred)
+        pred_set[index]=pred
+        index += 1
+        print(t2-t1)
+
+# %% 
+print(pred_set.shape, test_u.shape)
+#Logging Metrics 
+MSE_error = (pred_set - test_u_encoded).pow(2).mean()
+MAE_error = torch.abs(pred_set - test_u_encoded).mean()
+LP_error = loss / (ntest*T/step)
+
+print('(MSE) Testing Error: %.3e' % (MSE_error))
+print('(MAE) Testing Error: %.3e' % (MAE_error))
+print('(LP) Testing Error: %.3e' % (LP_error))
+
+run.update_metadata({'MSE Test Error': float(MSE_error),
+                     'MAE Test Error': float(MAE_error),
+                     'LP Test Error': float(LP_error)
+                    })
+
+pred_set_encoded = pred_set
+pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
+# %% 
+if configuration["Physics Normalisation"] == 'Yes':
+    pred_set[:,0:1,...] = pred_set[:,0:1,...] * 1e20
+    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e6
+    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e5
+
+
+    test_u[:,0:1,...] = test_u[:,0:1,...] * 1e20
+    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e6
+    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e5
+
+# %%
+#Plotting the comparison plots
+
+idx = np.random.randint(0,ntest) 
+idx = 5
+
+# %%
+output_plot = []
+for dim in range(num_vars):
+    u_field = test_u[idx]
+
+    v_min_1 = torch.min(u_field[dim,:,:,0])
+    v_max_1 = torch.max(u_field[dim,:,:,0])
+
+    v_min_2 = torch.min(u_field[dim, :, :, int(T/2)])
+    v_max_2 = torch.max(u_field[dim, :, :, int(T/2)])
+
+    v_min_3 = torch.min(u_field[dim, :, :, -1])
+    v_max_3 = torch.max(u_field[dim, :, :, -1])
+
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+    ax = fig.add_subplot(2,3,1)
+    pcm =ax.imshow(u_field[dim,:,:,0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    # ax.title.set_text('Initial')
+    ax.title.set_text('t='+ str(T_in))
+    ax.set_ylabel('Solution')
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,2)
+    pcm = ax.imshow(u_field[dim,:,:,int(T/2)], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2, vmax=v_max_2)
+    # ax.title.set_text('Middle')
+    ax.title.set_text('t='+ str(int((T+T_in)/2)))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,3)
+    pcm = ax.imshow(u_field[dim,:,:,-1], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    # ax.title.set_text('Final')
+    ax.title.set_text('t='+str(T+T_in))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    u_field = pred_set[idx]
+
+    ax = fig.add_subplot(2,3,4)
+    pcm = ax.imshow(u_field[dim,:,:,0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    ax.set_ylabel('FNO')
+
+    fig.colorbar(pcm, pad=0.05)
+
+    ax = fig.add_subplot(2,3,5)
+    pcm = ax.imshow(u_field[dim,:,:,int(T/2)], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2, vmax=v_max_2)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,6)
+    pcm = ax.imshow(u_field[dim,:,:,-1], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+    plt.title(dims[dim])
+
+
+pred_set_encoded_10 = pred_set_encoded
+test_set_encoded_10 = test_u_encoded
+
+# %% 
+#Step = 1
+step = 1
+
+################################################################
+# training and evaluation
+################################################################
+model = FNO_multi(modes, modes, width_vars, width_time)
+model.load_state_dict(torch.load(file_loc + '/Models/FNO_single_blob_partial-slide.pth', map_location=torch.device('cpu')))
+
+model.to(device)
+
+print("Number of model params : " + str(model.count_params()))
+
 
 
 # %%
+#Testing 
+batch_size = 1
+test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u_encoded), batch_size=1, shuffle=False)
+pred_set = torch.zeros(test_u.shape)
+index = 0
+with torch.no_grad():
+    for xx, yy in tqdm(test_loader):
+        loss = 0
+        xx, yy = xx.to(device), yy.to(device)
+        # xx = additive_noise(xx)
+        t1 = default_timer()
+        for t in range(0, T, step):
+            y = yy[..., t:t + step]
+            out = model(xx)
+            loss += myloss(out.reshape(batch_size, -1), y.reshape(batch_size, -1))
 
-CODE = ['FU_Net.py']
-INPUTS = []
-OUTPUTS = [model_loc, output_plot[0], output_plot[1], output_plot[2]]
+            if t == 0:
+                pred = out
+            else:
+                pred = torch.cat((pred, out), -1)       
 
-# Save code files
-for code_file in CODE:
-    if os.path.isfile(code_file):
-        run.save(code_file, 'code')
-    elif os.path.isdir(code_file):
-        run.save_directory(code_file, 'code', 'text/plain', preserve_path=True)
-    else:
-        print('ERROR: code file %s does not exist' % code_file)
+            xx = torch.cat((xx[..., step:], out), dim=-1)
+
+        t2 = default_timer()
+        # pred = y_normalizer.decode(pred)
+        pred_set[index]=pred
+        index += 1
+        print(t2-t1)
+
+# %% 
+print(pred_set.shape, test_u.shape)
+#Logging Metrics 
+MSE_error = (pred_set - test_u_encoded).pow(2).mean()
+MAE_error = torch.abs(pred_set - test_u_encoded).mean()
+LP_error = loss / (ntest*T/step)
+
+print('(MSE) Testing Error: %.3e' % (MSE_error))
+print('(MAE) Testing Error: %.3e' % (MAE_error))
+print('(LP) Testing Error: %.3e' % (LP_error))
+
+run.update_metadata({'MSE Test Error': float(MSE_error),
+                     'MAE Test Error': float(MAE_error),
+                     'LP Test Error': float(LP_error)
+                    })
+
+pred_set_encoded = pred_set
+pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
+# %% 
+if configuration["Physics Normalisation"] == 'Yes':
+    pred_set[:,0:1,...] = pred_set[:,0:1,...] * 1e20
+    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e6
+    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e5
 
 
-# Save input files
-for input_file in INPUTS:
-    if os.path.isfile(input_file):
-        run.save(input_file, 'input')
-    elif os.path.isdir(input_file):
-        run.save_directory(input_file, 'input', 'text/plain', preserve_path=True)
-    else:
-        print('ERROR: input file %s does not exist' % input_file)
-
-
-# Save output files
-for output_file in OUTPUTS:
-    if os.path.isfile(output_file):
-        run.save(output_file, 'output')
-    elif os.path.isdir(output_file):
-        run.save_directory(output_file, 'output', 'text/plain', preserve_path=True)   
-    else:
-        print('ERROR: output file %s does not exist' % output_file)
-
-run.close()
+    test_u[:,0:1,...] = test_u[:,0:1,...] * 1e20
+    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e6
+    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e5
 
 # %%
+#Plotting the comparison plots
 
+idx = np.random.randint(0,ntest) 
+idx = 5
+
+# %%
+output_plot = []
+for dim in range(num_vars):
+    u_field = test_u[idx]
+
+    v_min_1 = torch.min(u_field[dim,:,:,0])
+    v_max_1 = torch.max(u_field[dim,:,:,0])
+
+    v_min_2 = torch.min(u_field[dim, :, :, int(T/2)])
+    v_max_2 = torch.max(u_field[dim, :, :, int(T/2)])
+
+    v_min_3 = torch.min(u_field[dim, :, :, -1])
+    v_max_3 = torch.max(u_field[dim, :, :, -1])
+
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+    ax = fig.add_subplot(2,3,1)
+    pcm =ax.imshow(u_field[dim,:,:,0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    # ax.title.set_text('Initial')
+    ax.title.set_text('t='+ str(T_in))
+    ax.set_ylabel('Solution')
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,2)
+    pcm = ax.imshow(u_field[dim,:,:,int(T/2)], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2, vmax=v_max_2)
+    # ax.title.set_text('Middle')
+    ax.title.set_text('t='+ str(int((T+T_in)/2)))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,3)
+    pcm = ax.imshow(u_field[dim,:,:,-1], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    # ax.title.set_text('Final')
+    ax.title.set_text('t='+str(T+T_in))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    u_field = pred_set[idx]
+
+    ax = fig.add_subplot(2,3,4)
+    pcm = ax.imshow(u_field[dim,:,:,0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    ax.set_ylabel('FNO')
+
+    fig.colorbar(pcm, pad=0.05)
+
+    ax = fig.add_subplot(2,3,5)
+    pcm = ax.imshow(u_field[dim,:,:,int(T/2)], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2, vmax=v_max_2)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+
+    ax = fig.add_subplot(2,3,6)
+    pcm = ax.imshow(u_field[dim,:,:,-1], cmap=cm.coolwarm,  extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
+
+    plt.title(dims[dim])
+
+
+pred_set_encoded_1 = pred_set_encoded
+test_set_encoded_1 = test_u_encoded
+
+
+# %%
+# #Plotting the error growth across time.
+# err_rho = [] 
+# err_phi = []
+# err_T = []
+
+# for ii in range(T):
+#     err_rho.append(torch.abs(pred_set_encoded[:,0,:,:,ii] - test_u_encoded[:,0,:,:,ii]).mean())
+#     err_phi.append(torch.abs(pred_set_encoded[:,1,:,:,ii] - test_u_encoded[:,1,:,:,ii]).mean())
+#     err_T.append(torch.abs(pred_set_encoded[:,2,:,:,ii] - test_u_encoded[:,2,:,:,ii]).mean())
+
+# err_rho = np.asarray(err_rho)
+# err_phi = np.asarray(err_phi)
+# err_T = np.asarray(err_T)
+
+# # %%
+# plt.plot(np.arange(T_in, T_in + T), err_rho, label='Density', alpha=0.8,  color = 'tab:blue')
+# plt.plot(np.arange(T_in, T_in + T), err_phi, label='Potential', alpha=0.8,  color = 'tab:orange')
+# plt.plot(np.arange(T_in, T_in + T), err_T, label='Temp', alpha=0.8,  color = 'tab:green')
+# plt.plot(np.arange(T_in, T_in + T), (err_rho+err_phi+err_T), label='Cumulative', alpha=0.8,  color = 'tab:red', ls='--')
+# plt.legend()
+# plt.xlabel('Time Steps')
+# plt.ylabel('NMAE ')
+
+
+# %%
+#Plotting the error growth across time.
+err_1 = [] 
+err_5 = []
+err_10 = []
+
+for ii in range(T):
+    err_1.append(torch.abs(pred_set_encoded_1[:,:,:,:,ii] - test_set_encoded_1[:,:,:,:,ii]).mean())
+    err_5.append(torch.abs(pred_set_encoded_5[:,:,:,:,ii] - test_set_encoded_5[:,:,:,:,ii]).mean())
+    err_10.append(torch.abs(pred_set_encoded_10[:,:,:,:,ii] - test_set_encoded_10[:,:,:,:,ii]).mean())
+
+err_1 = np.asarray(err_1)
+err_5 = np.asarray(err_5)
+err_10 = np.asarray(err_10)
+
+# %%
+import matplotlib as mpl
+mpl.rcParams['xtick.minor.visible']=True
+mpl.rcParams['font.size']=45
+mpl.rcParams['figure.figsize']=(16,16)
+mpl.rcParams['xtick.minor.visible']=True
+mpl.rcParams['axes.linewidth']= 3
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] =15
+plt.rcParams['ytick.major.size'] =15
+plt.rcParams['xtick.minor.size'] =10
+plt.rcParams['ytick.minor.size'] =10
+plt.rcParams['xtick.major.width'] =5
+plt.rcParams['ytick.major.width'] =5
+plt.rcParams['xtick.minor.width'] =5
+plt.rcParams['ytick.minor.width'] =5
+mpl.rcParams['axes.titlepad'] = 20
+mpl.rcParams['lines.linewidth'] = 5
+plt.figure()
+
+plt.plot(np.arange(T_in, T_in + T), err_1, label='Step=1', alpha=0.8,  color = 'darkorange', linewidth=5)
+plt.plot(np.arange(T_in, T_in + T), err_5, label='Step=5', alpha=0.8,  color = 'firebrick', linewidth=5)
+plt.plot(np.arange(T_in, T_in + T), err_10, label='Step=10', alpha=0.8,  color = 'teal', linewidth=5)
+plt.grid()
+plt.legend()
+plt.xlabel('Time Steps')
+plt.ylabel('NMAE ')
+
+plt.savefig("single_blob_error_steps.pdf", bbox_inches='tight')
+plt.savefig("single_blob_error_steps.svg", bbox_inches='tight')
+
+# %%

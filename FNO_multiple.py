@@ -4,12 +4,12 @@
 """
 Created on 6 Jan 2023
 @author: vgopakum
-FNO modelled over the MHD data built using JOREK for multi-blob diffusion. 
+FNO modelled over the MHD data built using JOREK for single-blob diffusion. 
 
 Multivariable FNO
 """
 # %%
-configuration = {"Case": 'Multi-Blobs',
+configuration = {"Case": 'Single-Blobs',
                  "Field": 'rho, Phi, T',
                  "Field_Mixing": 'Channel',
                  "Type": '2D Time',
@@ -27,7 +27,7 @@ configuration = {"Case": 'Multi-Blobs',
                  "T_in": 10,    
                  "T_out": 40,
                  "Step": 5,
-                 "Modes": 32.1,
+                 "Modes": 16,
                  "Width_time":32, #FNO
                  "Width_vars": 0, #U-Net
                  "Variables":3, 
@@ -43,9 +43,10 @@ configuration = {"Case": 'Multi-Blobs',
 # %%
 from simvue import Run
 run = Run()
-run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Multi-Blobs', 'MultiVariable', "Skip_Connect", "Decreasing Modes"], metadata=configuration)
+run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Single-Blob', 'MultiVariable', "Skip_Connect", "rho-T", "MinMax-across-vars"], metadata=configuration)
 
 # %% 
+import os 
 CODE = ['FNO_multiple.py']
 
 # Save code files
@@ -82,7 +83,6 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 # %% 
-import os 
 path = os.getcwd()
 data_loc = os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd())))
 # model_loc = os.path.dirname(os.path.dirname(os.getcwd()))
@@ -195,83 +195,115 @@ class RangeNormalizer(object):
         self.a = self.a.cpu()
         self.b = self.b.cpu()
 
-#normalization, rangewise but single value. 
-class MinMax_Normalizer(object):
-    def __init__(self, x, low=0.0, high=1.0):
-        super(MinMax_Normalizer, self).__init__()
-        min_u = torch.min(x[:,0,:,:,:])
-        max_u = torch.max(x[:,0,:,:,:])
+# #normalization, rangewise but single value. 
+# class MinMax_Normalizer(object):
+#     def __init__(self, x, low=0.0, high=1.0):
+#         super(MinMax_Normalizer, self).__init__()
+#         min_u = torch.min(x[:,0,:,:,:])
+#         max_u = torch.max(x[:,0,:,:,:])
 
-        self.a_u = (high - low)/(max_u - min_u)
-        self.b_u = -self.a_u*max_u + high
+#         self.a_u = (high - low)/(max_u - min_u)
+#         self.b_u = -self.a_u*max_u + high
 
-        min_v = torch.min(x[:,1,:,:,:])
-        max_v = torch.max(x[:,1,:,:,:])
+#         min_v = torch.min(x[:,1,:,:,:])
+#         max_v = torch.max(x[:,1,:,:,:])
 
-        self.a_v = (high - low)/(max_v - min_v)
-        self.b_v = -self.a_v*max_v + high
+#         self.a_v = (high - low)/(max_v - min_v)
+#         self.b_v = -self.a_v*max_v + high
 
-        min_p = torch.min(x[:,2,:,:,:])
-        max_p = torch.max(x[:,2,:,:,:])
+#         min_p = torch.min(x[:,2,:,:,:])
+#         max_p = torch.max(x[:,2,:,:,:])
 
-        self.a_p = (high - low)/(max_p - min_p)
-        self.b_p = -self.a_p*max_p + high
+#         self.a_p = (high - low)/(max_p - min_p)
+#         self.b_p = -self.a_p*max_p + high
         
+
+#     def encode(self, x):
+#         s = x.size()
+
+#         u = x[:,0,:,:,:]
+#         u = self.a_u*u + self.b_u
+
+#         v = x[:,1,:,:,:]
+#         v = self.a_v*v + self.b_v
+
+#         p = x[:,2,:,:,:]
+#         p = self.a_p*p + self.b_p
+        
+#         x = torch.stack((u,v,p), dim=1)
+
+#         return x
+
+#     def decode(self, x):
+#         s = x.size()
+
+#         u = x[:,0,:,:,:]
+#         u = (u - self.b_u)/self.a_u
+        
+#         v = x[:,1,:,:,:]
+#         v = (v - self.b_v)/self.a_v
+
+#         p = x[:,2,:,:,:]
+#         p = (p - self.b_p)/self.a_p
+
+
+#         x = torch.stack((u,v,p), dim=1)
+
+#         return x
+
+#     def cuda(self):
+#         self.a_u = self.a_u.cuda()
+#         self.b_u = self.b_u.cuda()
+        
+#         self.a_v = self.a_v.cuda()
+#         self.b_v = self.b_v.cuda() 
+
+#         self.a_p = self.a_p.cuda()
+#         self.b_p = self.b_p.cuda()
+
+
+#     def cpu(self):
+#         self.a_u = self.a_u.cpu()
+#         self.b_u = self.b_u.cpu()
+        
+#         self.a_v = self.a_v.cpu()
+#         self.b_v = self.b_v.cpu()
+
+#         self.a_p = self.a_p.cpu()
+#         self.b_p = self.b_p.cpu()
+
+
+#normalization, rangewise but across the full domain 
+class MinMax_Normalizer(object):
+    def __init__(self, x, low=-1.0, high=1.0):
+        super(MinMax_Normalizer, self).__init__()
+        mymin = torch.min(x)
+        mymax = torch.max(x)
+
+        self.a = (high - low)/(mymax - mymin)
+        self.b = -self.a*mymax + high
 
     def encode(self, x):
         s = x.size()
-
-        u = x[:,0,:,:,:]
-        u = self.a_u*u + self.b_u
-
-        v = x[:,1,:,:,:]
-        v = self.a_v*v + self.b_v
-
-        p = x[:,2,:,:,:]
-        p = self.a_p*p + self.b_p
-        
-        x = torch.stack((u,v,p), dim=1)
-
+        x = x.reshape(s[0], -1)
+        x = self.a*x + self.b
+        x = x.view(s)
         return x
 
     def decode(self, x):
         s = x.size()
-
-        u = x[:,0,:,:,:]
-        u = (u - self.b_u)/self.a_u
-        
-        v = x[:,1,:,:,:]
-        v = (v - self.b_v)/self.a_v
-
-        p = x[:,2,:,:,:]
-        p = (p - self.b_p)/self.a_p
-
-
-        x = torch.stack((u,v,p), dim=1)
-
+        x = x.reshape(s[0], -1)
+        x = (x - self.b)/self.a
+        x = x.view(s)
         return x
 
     def cuda(self):
-        self.a_u = self.a_u.cuda()
-        self.b_u = self.b_u.cuda()
-        
-        self.a_v = self.a_v.cuda()
-        self.b_v = self.b_v.cuda() 
-
-        self.a_p = self.a_p.cuda()
-        self.b_p = self.b_p.cuda()
-
+        self.a = self.a.cuda()
+        self.b = self.b.cuda()
 
     def cpu(self):
-        self.a_u = self.a_u.cpu()
-        self.b_u = self.b_u.cpu()
-        
-        self.a_v = self.a_v.cpu()
-        self.b_v = self.b_v.cpu()
-
-        self.a_p = self.a_p.cpu()
-        self.b_p = self.b_p.cpu()
-
+        self.a = self.a.cpu()
+        self.b = self.b.cpu()
 
 
 # %%
@@ -334,7 +366,7 @@ size_x = S
 size_y = S
 
 
-# modes = configuration['Modes']
+modes = configuration['Modes']
 width_time = configuration['Width_time']
 width_vars = configuration['Width_vars']
 output_size = configuration['Step']
@@ -463,19 +495,19 @@ class FNO_multi(nn.Module):
 
         # self.padding = 8 # pad the domain if input is non-periodic
 
-        # self.f0 = FNO2d(self.modes1, self.modes2, self.width_time)
-        # self.f1 = FNO2d(self.modes1, self.modes2, self.width_time)
-        # self.f2 = FNO2d(self.modes1, self.modes2, self.width_time)
-        # self.f3 = FNO2d(self.modes1, self.modes2, self.width_time)
-        # self.f4 = FNO2d(self.modes1, self.modes2, self.width_time)
-        # self.f5 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f0 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f1 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f2 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f3 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f4 = FNO2d(self.modes1, self.modes2, self.width_time)
+        self.f5 = FNO2d(self.modes1, self.modes2, self.width_time)
 
-        self.f0 = FNO2d(32, 32, self.width_time)
-        self.f1 = FNO2d(32, 16, self.width_time)
-        self.f2 = FNO2d(16, 8, self.width_time)
-        self.f3 = FNO2d(8, 4, self.width_time)
-        self.f4 = FNO2d(4, 2, self.width_time)
-        self.f5 = FNO2d(2, 1, self.width_time)
+        # self.f0 = FNO2d(32, 32, self.width_time)
+        # self.f1 = FNO2d(32, 16, self.width_time)
+        # self.f2 = FNO2d(16, 8, self.width_time)
+        # self.f3 = FNO2d(8, 4, self.width_time)
+        # self.f4 = FNO2d(4, 2, self.width_time)
+        # self.f5 = FNO2d(2, 1, self.width_time)
 
         # self.dropout = nn.Dropout(p=0.1)
 
@@ -557,7 +589,7 @@ class FNO_multi(nn.Module):
 ################################################################
 
 # %%
-data = data_loc + '/Data/MHD_multi_blobs.npz'
+data = data_loc + '/Data/MHD_single_blob.npz'
 
 # %%
 field = configuration['Field']
@@ -591,8 +623,8 @@ y_grid = np.load(data)['Zgrid'][:,0].astype(np.float32)
 t_grid = np.load(data)['time'].astype(np.float32)
 
 
-ntrain =240
-ntest = 38
+ntrain = 160
+ntest = 20
 S = 106 #Grid Size
 size_x = S
 size_y = S
@@ -644,7 +676,6 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 # training and evaluation
 ################################################################
-modes = 32
 model = FNO_multi(modes, modes, width_vars, width_time)
 model.to(device)
 
@@ -721,7 +752,8 @@ for ep in tqdm(range(epochs)):
             # pred = y_normalizer.decode(pred)
 
             test_l2_step += loss.item()
-            test_l2_full += myloss(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1)).item()
+            l2_full = myloss(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1))
+            test_l2_full += l2_full.item()
 
     t2 = default_timer()
     scheduler.step()
@@ -737,7 +769,7 @@ for ep in tqdm(range(epochs)):
 train_time = time.time() - start_time
 # %%
 #Saving the Model
-model_loc = file_loc + '/Models/FNO_multi_blobs_' + run.name + '.pth'
+model_loc = file_loc + '/Models/FNO_single_blob_' + run.name + '.pth'
 torch.save(model.state_dict(),  model_loc)
 
 # %%
@@ -864,7 +896,7 @@ for dim in range(num_vars):
 
     plt.title(dims[dim])
 
-    output_plot.append(file_loc + '/Plots/MultiBlobs_' + dims[dim] + '_' + run.name + '.png')
+    output_plot.append(file_loc + '/Plots/SingleBlob_' + dims[dim] + '_' + run.name + '.png')
     plt.savefig(output_plot[dim])
 
 # %%
