@@ -292,9 +292,11 @@ class LpLoss(object):
 #         self.std = self.std.cpu()
 # # additive_noise = AddGaussianNoise(0.0, configuration['Noise'])
 # additive_noise.cuda()
+# %%
 ################################################################
 # fourier layer
 ################################################################
+
 class SpectralConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
         super(SpectralConv2d, self).__init__()
@@ -316,6 +318,7 @@ class SpectralConv2d(nn.Module):
     def compl_mul2d(self, input, weights):
         # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
         return torch.einsum("bixy,ioxy->boxy", input, weights)
+
 
     def forward(self, x):
         batchsize = x.shape[0]
@@ -476,7 +479,6 @@ elif field == 'T':
 elif field == 'rho':
     u_sol = np.load(data)['rho'].astype(np.float32)   / 1e20
 
-
 if configuration['Log Normalisation'] == 'Yes':
     u_sol = np.log(u_sol)
 
@@ -532,7 +534,6 @@ if norm_strategy == 'Range':
 if norm_strategy == 'Gaussian':
     a_normalizer = GaussianNormalizer(train_a)
     y_normalizer = GaussianNormalizer(train_u)
-
 
 
 train_a = a_normalizer.encode(train_a)
@@ -611,8 +612,6 @@ for ep in tqdm(range(epochs)): #Training Loop - Epochwise
         loss.backward()
         # train_l2_full.backward()
         optimizer.step()
-
-
     train_loss = train_l2_full / ntrain
 
 #Validation Loop
@@ -634,6 +633,7 @@ for ep in tqdm(range(epochs)): #Training Loop - Epochwise
             test_loss += myloss(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1)).item() 
         test_loss = test_loss / ntest
     t2 = default_timer()
+
 
     print('Epochs: %d, Time: %.2f, Train Loss per step: %.3e, Train Loss: %.3e, Test Loss: %.3e' % (ep, t2 - t1, train_l2_step / ntrain / (T / step), train_loss, test_loss))
 

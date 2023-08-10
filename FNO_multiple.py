@@ -43,7 +43,7 @@ configuration = {"Case": 'Single-Blobs',
 # %%
 from simvue import Run
 run = Run()
-run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Single-Blob', 'MultiVariable', "Skip_Connect", "rho-T", "MinMax-across-vars"], metadata=configuration)
+run.init(folder="/FNO_MHD", tags=['FNO', 'MHD', 'JOREK', 'Single-Blob', 'MultiVariable', "Skip_Connect", "No Padding"], metadata=configuration)
 
 # %% 
 import os 
@@ -359,12 +359,7 @@ class LpLoss(object):
 
 
 # %% 
-x_grid = np.arange(0, 106)
-y_grid = np.arange(0, 106)
-S = 106 #Grid Size
-size_x = S
-size_y = S
-
+#Extracting the configuration settings
 
 modes = configuration['Modes']
 width_time = configuration['Width_time']
@@ -382,12 +377,8 @@ T = configuration['T_out']
 step = configuration['Step']
 num_vars = configuration['Variables']
 
-
-
 # %%
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 # %%
 
@@ -617,15 +608,18 @@ t_res = configuration['Temporal Resolution']
 x_res = configuration['Spatial Resolution']
 uvp = torch.stack((u,v,p), dim=1)[:,::t_res]
 
-
 x_grid = np.load(data)['Rgrid'][0,:].astype(np.float32)
 y_grid = np.load(data)['Zgrid'][:,0].astype(np.float32)
 t_grid = np.load(data)['time'].astype(np.float32)
 
+#Padding Removed 
+uvp = uvp[:, :, 3:-3, 3:-3, :]
+x_grid = x_grid[3:-3]
+y_grid = y_grid[3:-3]
 
 ntrain = 160
 ntest = 20
-S = 106 #Grid Size
+S = uvp.shape[3] #Grid Size
 size_x = S
 size_y = S
 
@@ -757,7 +751,6 @@ for ep in tqdm(range(epochs)):
 
     run.log_metrics({'Train Loss': train_loss, 
                     'Test Loss': test_loss})
-
 
 train_time = time.time() - start_time
 # %%
