@@ -19,7 +19,7 @@ configuration = {"Case": 'Single-Blobs',
                  "Scheduler Step": 100,
                  "Scheduler Gamma": 0.5,
                  "Activation": 'GELU',
-                 "Normalisation Strategy": 'Min-Max',
+                 "Normalisation Strategy": 'Min-Max. Same',
                  "Instance Norm": 'No',
                  "Log Normalisation": 'No',
                  "Physics Normalisation": 'Yes',
@@ -196,81 +196,81 @@ class RangeNormalizer(object):
         self.b = self.b.cpu()
 
 
-# normalization, rangewise but single value.
-class MinMax_Normalizer(object):
-    def __init__(self, x, low=0.0, high=1.0):
-        super(MinMax_Normalizer, self).__init__()
-        min_u = torch.min(x[:, 0, :, :, :])
-        max_u = torch.max(x[:, 0, :, :, :])
+# # normalization, rangewise but single value.
+# class MinMax_Normalizer(object):
+#     def __init__(self, x, low=0.0, high=1.0):
+#         super(MinMax_Normalizer, self).__init__()
+#         min_u = torch.min(x[:, 0, :, :, :])
+#         max_u = torch.max(x[:, 0, :, :, :])
 
-        self.a_u = (high - low) / (max_u - min_u)
-        self.b_u = -self.a_u * max_u + high
+#         self.a_u = (high - low) / (max_u - min_u)
+#         self.b_u = -self.a_u * max_u + high
 
-        min_v = torch.min(x[:, 1, :, :, :])
-        max_v = torch.max(x[:, 1, :, :, :])
+#         min_v = torch.min(x[:, 1, :, :, :])
+#         max_v = torch.max(x[:, 1, :, :, :])
 
-        self.a_v = (high - low) / (max_v - min_v)
-        self.b_v = -self.a_v * max_v + high
+#         self.a_v = (high - low) / (max_v - min_v)
+#         self.b_v = -self.a_v * max_v + high
 
-        min_p = torch.min(x[:, 2, :, :, :])
-        max_p = torch.max(x[:, 2, :, :, :])
+#         min_p = torch.min(x[:, 2, :, :, :])
+#         max_p = torch.max(x[:, 2, :, :, :])
 
-        self.a_p = (high - low) / (max_p - min_p)
-        self.b_p = -self.a_p * max_p + high
+#         self.a_p = (high - low) / (max_p - min_p)
+#         self.b_p = -self.a_p * max_p + high
 
-        print(min_u, max_u, min_v, max_v, min_p, max_p)
+#         print(min_u, max_u, min_v, max_v, min_p, max_p)
 
-    def encode(self, x):
-        s = x.size()
+#     def encode(self, x):
+#         s = x.size()
 
-        u = x[:, 0, :, :, :]
-        u = self.a_u * u + self.b_u
+#         u = x[:, 0, :, :, :]
+#         u = self.a_u * u + self.b_u
 
-        v = x[:, 1, :, :, :]
-        v = self.a_v * v + self.b_v
+#         v = x[:, 1, :, :, :]
+#         v = self.a_v * v + self.b_v
 
-        p = x[:, 2, :, :, :]
-        p = self.a_p * p + self.b_p
+#         p = x[:, 2, :, :, :]
+#         p = self.a_p * p + self.b_p
 
-        x = torch.stack((u, v, p), dim=1)
+#         x = torch.stack((u, v, p), dim=1)
 
-        return x
+#         return x
 
-    def decode(self, x):
-        s = x.size()
+#     def decode(self, x):
+#         s = x.size()
 
-        u = x[:, 0, :, :, :]
-        u = (u - self.b_u) / self.a_u
+#         u = x[:, 0, :, :, :]
+#         u = (u - self.b_u) / self.a_u
 
-        v = x[:, 1, :, :, :]
-        v = (v - self.b_v) / self.a_v
+#         v = x[:, 1, :, :, :]
+#         v = (v - self.b_v) / self.a_v
 
-        p = x[:, 2, :, :, :]
-        p = (p - self.b_p) / self.a_p
+#         p = x[:, 2, :, :, :]
+#         p = (p - self.b_p) / self.a_p
 
-        x = torch.stack((u, v, p), dim=1)
+#         x = torch.stack((u, v, p), dim=1)
 
-        return x
+#         return x
 
-    def cuda(self):
-        self.a_u = self.a_u.cuda()
-        self.b_u = self.b_u.cuda()
+#     def cuda(self):
+#         self.a_u = self.a_u.cuda()
+#         self.b_u = self.b_u.cuda()
 
-        self.a_v = self.a_v.cuda()
-        self.b_v = self.b_v.cuda()
+#         self.a_v = self.a_v.cuda()
+#         self.b_v = self.b_v.cuda()
 
-        self.a_p = self.a_p.cuda()
-        self.b_p = self.b_p.cuda()
+#         self.a_p = self.a_p.cuda()
+#         self.b_p = self.b_p.cuda()
 
-    def cpu(self):
-        self.a_u = self.a_u.cpu()
-        self.b_u = self.b_u.cpu()
+#     def cpu(self):
+#         self.a_u = self.a_u.cpu()
+#         self.b_u = self.b_u.cpu()
 
-        self.a_v = self.a_v.cpu()
-        self.b_v = self.b_v.cpu()
+#         self.a_v = self.a_v.cpu()
+#         self.b_v = self.b_v.cpu()
 
-        self.a_p = self.a_p.cpu()
-        self.b_p = self.b_p.cpu()
+#         self.a_p = self.a_p.cpu()
+#         self.b_p = self.b_p.cpu()
 
 class LogNormalizer(object):
     def __init__(self, x,  low=0.0, high=1.0, eps=0.01):
@@ -350,37 +350,37 @@ class LogNormalizer(object):
         self.b_p = self.b_p.cpu()
 
 
-# #normalization, rangewise but across the full domain 
-# class MinMax_Normalizer(object):
-#     def __init__(self, x, low=-1.0, high=1.0):
-#         super(MinMax_Normalizer, self).__init__()
-#         mymin = torch.min(x)
-#         mymax = torch.max(x)
+#normalization, rangewise but across the full domain 
+class MinMax_Normalizer(object):
+    def __init__(self, x, low=-1.0, high=1.0):
+        super(MinMax_Normalizer, self).__init__()
+        mymin = torch.min(x)
+        mymax = torch.max(x)
 
-#         self.a = (high - low)/(mymax - mymin)
-#         self.b = -self.a*mymax + high
+        self.a = (high - low)/(mymax - mymin)
+        self.b = -self.a*mymax + high
 
-#     def encode(self, x):
-#         s = x.size()
-#         x = x.reshape(s[0], -1)
-#         x = self.a*x + self.b
-#         x = x.view(s)
-#         return x
+    def encode(self, x):
+        s = x.size()
+        x = x.reshape(s[0], -1)
+        x = self.a*x + self.b
+        x = x.view(s)
+        return x
 
-#     def decode(self, x):
-#         s = x.size()
-#         x = x.reshape(s[0], -1)
-#         x = (x - self.b)/self.a
-#         x = x.view(s)
-#         return x
+    def decode(self, x):
+        s = x.size()
+        x = x.reshape(s[0], -1)
+        x = (x - self.b)/self.a
+        x = x.view(s)
+        return x
 
-#     def cuda(self):
-#         self.a = self.a.cuda()
-#         self.b = self.b.cuda()
+    def cuda(self):
+        self.a = self.a.cuda()
+        self.b = self.b.cuda()
 
-#     def cpu(self):
-#         self.a = self.a.cpu()
-#         self.b = self.b.cpu()
+    def cpu(self):
+        self.a = self.a.cpu()
+        self.b = self.b.cpu()
 
 # %%
 ##################################

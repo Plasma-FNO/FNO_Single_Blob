@@ -607,8 +607,8 @@ x_grid = np.load(data)['Rgrid'][0,:].astype(np.float32)
 y_grid = np.load(data)['Zgrid'][:,0].astype(np.float32)
 t_grid = np.load(data)['time'].astype(np.float32)
 
-ntrain =240
-ntest = 36
+ntrain =160 
+ntest = 20
 
 # ntrain = 1500 #new dataset
 # ntest = 85 #new dataset
@@ -661,8 +661,7 @@ print('preprocessing finished, time used:', t2-t1)
 
 # model = FNO_multi(16, 16, width_vars, width_time)
 model = FNO_multi(T_in, step, num_vars, modes, modes, width_vars, width_time)
-model.load_state_dict(torch.load(file_loc + '/Models/FNO_multi_blobs_crunchy-mead.pth', map_location=torch.device('cpu'))) #250 Epochs 
-
+model.load_state_dict(torch.load(file_loc + '/Models/FNO_multi_blobs_crunchy-mead.pth', map_location=torch.device('cpu')))
 
 model.to(device)
 
@@ -783,8 +782,8 @@ idx = np.random.randint(0,ntest)
 # idx = 5
 # idx = 36
 # idx = 3
-# idx = 5  
-idx = 15
+idx = 5  
+# idx = 15
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib as mpl
 mpl.rcParams['font.size']=16
@@ -862,10 +861,12 @@ for dim in range(num_vars):
     cax = divider.append_axes("right", size="5%", pad=0.1)
     cbar = fig.colorbar(pcm, cax=cax)
     cbar.formatter.set_powerlimits((0, 0))
+    
+    plt.savefig("single-blob_" + dims[dim] + "_" + str(idx) + "_crunchy-mead.pdf", format="pdf", bbox_inches='tight', transparent='True')
 
 # %% 
 #Error Plots
-idx = 8
+idx = 15
 output_plot = []
 for dim in range(num_vars):
     u_field = test_u[idx]
@@ -965,10 +966,10 @@ for dim in range(num_vars):
     ax.axes.yaxis.set_ticks([])
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
-    cbar = fig.colorbar(pcm, cax=cax)
+    cbar = fig.colorbar(pcm, cax=cax)   
     cbar.formatter.set_powerlimits((0, 0))
 
-    # plt.savefig("multiblobs_" + dims[dim] + "_" + str(idx) + "_reduced-fort.pdf", format="pdf", bbox_inches='tight', transparent='True')
+    plt.savefig("single-blob_" + dims[dim] + "_" + str(idx) + "_crunchy-mead.pdf", format="pdf", bbox_inches='tight', transparent='True')
 
 
 
@@ -1524,15 +1525,13 @@ for field in dims:
         u_sol = np.log(u_sol)
 
     u_sol = np.nan_to_num(u_sol)
-    # u_sol = np.delete(u_sol, (11, 160, 222, 273, 303, 357, 620, 797, 983, 1275, 1391, 1458, 1554, 1600, 1613, 1888, 1937, 1946, 1959), axis=0)
-    u_sol= np.delete(u_sol, (153, 229), axis=0) #Outlier T values
 
     x_grid = np.load(data)['Rgrid'][0,:].astype(np.float32)
     y_grid = np.load(data)['Zgrid'][:,0].astype(np.float32)
     t_grid = np.load(data)['time'].astype(np.float32)
 
-    ntrain = 240
-    ntest = 36
+    ntrain = 160
+    ntest = 20
     S =106  # Grid Size
 
     #Extracting hyperparameters from the config dict
@@ -1804,6 +1803,6 @@ plt.legend()
 plt.xlabel('Time Steps')
 plt.ylabel('MAE ')
 
-# plt.savefig("multiblobs_error_growth.pdf", bbox_inches='tight')
-# plt.savefig("multiblobs_error_growth.svg", bbox_inches='tight')
+plt.savefig("singleblob_error_growth.pdf", bbox_inches='tight')
+plt.savefig("singleblob_error_growth.svg", bbox_inches='tight')
 # %%

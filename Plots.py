@@ -731,13 +731,13 @@ pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
 # %% 
 if configuration["Physics Normalisation"] == 'Yes':
     pred_set[:,0:1,...] = pred_set[:,0:1,...] * 1e20
-    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e6
-    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e5
+    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e5 / 1e2
+    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e6 /1e4
 
 
     test_u[:,0:1,...] = test_u[:,0:1,...] * 1e20
-    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e6
-    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e5
+    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e5 / 1e2
+    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e6 / 1e4
 
 # %%
 #Plotting the comparison plots
@@ -745,7 +745,7 @@ if configuration["Physics Normalisation"] == 'Yes':
 idx = np.random.randint(0,ntest) 
 
 # %%
-idx = 3
+idx = 10
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
