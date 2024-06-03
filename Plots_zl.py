@@ -768,13 +768,13 @@ err_T = np.asarray(err_T)
 # %% 
 if configuration["Physics Normalisation"] == 'Yes':
     pred_set[:,0:1,...] = pred_set[:,0:1,...] * 1e20
-    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e5
-    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e6
+    pred_set[:,1:2,...] = pred_set[:,1:2,...] * 1e5 / 1e2
+    pred_set[:,2:3,...] = pred_set[:,2:3,...] * 1e6 / 1e4
 
 
     test_u[:,0:1,...] = test_u[:,0:1,...] * 1e20
-    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e5
-    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e6
+    test_u[:,1:2,...] = test_u[:,1:2,...] * 1e5 / 1e2
+    test_u[:,2:3,...] = test_u[:,2:3,...] * 1e6 / 1e4
 
 # %%
 #Plotting the comparison plots
@@ -866,7 +866,7 @@ for dim in range(num_vars):
 
 # %% 
 #Error Plots
-idx = 15
+idx = 3
 output_plot = []
 for dim in range(num_vars):
     u_field = test_u[idx]
@@ -969,7 +969,7 @@ for dim in range(num_vars):
     cbar = fig.colorbar(pcm, cax=cax)   
     cbar.formatter.set_powerlimits((0, 0))
 
-    plt.savefig("single-blob_" + dims[dim] + "_" + str(idx) + "_crunchy-mead.pdf", format="pdf", bbox_inches='tight', transparent='True')
+    plt.savefig("single-blob_" + dims[dim] + "_" + str(idx) + "_crunchy-mead_err.pdf", format="pdf", bbox_inches='tight', transparent='True')
 
 
 
